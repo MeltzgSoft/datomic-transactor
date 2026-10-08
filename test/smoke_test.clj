@@ -24,11 +24,29 @@
 
 (def ^:dynamic *conn* nil)
 
+(defn- retry-until-transactor
+  "The transactor logs \"System started\" slightly before it publishes its
+  location in storage; a peer that connects in that gap gets
+  :db.error/read-transactor-location-failed. Retry that error only."
+  [f]
+  (loop [attempt 1]
+    (let [result (try
+                   {:value (f)}
+                   (catch Exception e
+                     (if (and (< attempt 30)
+                              (= :db.error/read-transactor-location-failed
+                                 (:db/error (ex-data e))))
+                       ::retry
+                       (throw e))))]
+      (if (= ::retry result)
+        (do (Thread/sleep 2000) (recur (inc attempt)))
+        (:value result)))))
+
 (defn db-fixture
   "Start every run from a fresh database and remove it afterwards."
   [f]
-  (d/delete-database uri)
-  (d/create-database uri)
+  (retry-until-transactor #(d/delete-database uri))
+  (retry-until-transactor #(d/create-database uri))
   (let [conn (d/connect uri)]
     @(d/transact conn schema)
     @(d/transact conn people)
