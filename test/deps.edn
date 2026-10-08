@@ -1,0 +1,4 @@
+{:paths ["."]
+ :deps {com.datomic/peer              {:mvn/version "1.0.7705"}
+        org.postgresql/postgresql     {:mvn/version "42.7.4"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.12"}}}

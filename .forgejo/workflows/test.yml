@@ -1,0 +1,84 @@
+name: Smoke test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  smoke:
+    # The general runner gives job containers no docker socket, so the compose
+    # stack cannot run here. Postgres is a services: sidecar instead, and the
+    # job installs Datomic and runs the image's real entrypoint.sh directly.
+    # This exercises the entrypoint, properties template, init-db scripts and
+    # test/smoke.clj, but not the built image itself.
+    runs-on: linux
+
+    env:
+      DATOMIC_DB_HOST: postgres
+      DATOMIC_DB_USER: datomic
+      DATOMIC_DB_PASSWORD: datomic
+      DATOMIC_ADMIN_USER: postgres
+      DATOMIC_ADMIN_PASSWORD: postgres
+      # transactor and peer share this container, so peers reach it on localhost
+      DATOMIC_ALT_HOST: localhost
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-start-period 60s
+          --health-retries 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java 21
+        uses: https://github.com/actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: 'temurin'
+      - name: Install Clojure CLI
+        # See pigeon-scoops-backend: setup-clojure calls the GitHub API with a
+        # Forgejo token and fails; the official pinned installer needs no GitHub.
+        run: |
+          curl -sLO https://download.clojure.org/install/linux-install-1.12.4.1618.sh
+          chmod +x linux-install-1.12.4.1618.sh
+          ./linux-install-1.12.4.1618.sh
+      - name: Install entrypoint dependencies
+        run: apt-get update && apt-get install -y --no-install-recommends gettext-base postgresql-client unzip
+      - name: Install Datomic
+        # Version comes from the Dockerfile so there is one place to bump it.
+        run: |
+          VERSION=$(grep -oE 'datomic-pro-[0-9.]+\.zip' Dockerfile | head -1 | sed -E 's/datomic-pro-(.*)\.zip/\1/')
+          curl -fSL -o /tmp/datomic.zip "https://datomic-pro-downloads.s3.amazonaws.com/${VERSION}/datomic-pro-${VERSION}.zip"
+          unzip -q /tmp/datomic.zip -d /opt
+          mv "/opt/datomic-pro-${VERSION}" /opt/datomic
+          cp transactor.properties.template /opt/datomic/
+          install -m 755 entrypoint.sh /entrypoint.sh
+      - name: Initialise the database
+        run: /entrypoint.sh init-db
+      - name: Start the transactor
+        run: |
+          nohup /entrypoint.sh > transactor.log 2>&1 &
+          for i in $(seq 1 60); do
+            grep -q "System started" transactor.log && exit 0
+            sleep 2
+          done
+          echo "transactor did not start:" >&2
+          cat transactor.log >&2
+          exit 1
+      - name: Smoke test
+        working-directory: test
+        env:
+          DATOMIC_URI: datomic:sql://smoke-test?jdbc:postgresql://postgres:5432/datomic?user=datomic&password=datomic
+        run: clojure -M smoke.clj
+      - name: Transactor log
+        if: failure()
+        run: cat transactor.log

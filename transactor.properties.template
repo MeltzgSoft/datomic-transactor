@@ -1,7 +1,7 @@
 protocol=sql
 host=0.0.0.0
 alt-host=${DATOMIC_ALT_HOST}
-port=4334
+port=${DATOMIC_PORT}
 
 sql-url=jdbc:postgresql://${DATOMIC_DB_HOST}:${DATOMIC_DB_PORT}/${DATOMIC_DB_NAME}
 sql-user=${DATOMIC_DB_USER}

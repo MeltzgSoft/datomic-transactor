@@ -41,16 +41,18 @@ services:
       DATOMIC_DB_USER: datomic
       DATOMIC_DB_PASSWORD: datomic
       DATOMIC_ALT_HOST: transactor
+      DATOMIC_PORT: ${DATOMIC_PORT:-4334}
       DATOMIC_LICENSE_KEY: ${DATOMIC_LICENSE_KEY:-}
     ports:
-      - "4334:4334"
+      - "${DATOMIC_PORT:-4334}:${DATOMIC_PORT:-4334}"
 
-  # smoke test: docker compose run --rm smoke-test   (needs the stack up)
+  # Stand-in for an external app (separate image, peer from Maven Central).
+  # Run with: docker compose run --rm smoke-test   (needs the stack up)
   smoke-test:
-    image: datomic-transactor
+    build: ./test
     profiles: ["test"]
-    entrypoint: ["java", "-Dlogback.configurationFile=/opt/datomic/bin/logback.xml", "-cp", "/opt/datomic/peer-1.0.7705.jar:/opt/datomic/lib/*", "clojure.main", "/test/smoke.clj"]
-    volumes:
-      - ./test:/test:ro
+    environment:
+      # only Postgres is in the URI; the peer finds the transactor (alt-host:port) via storage
+      DATOMIC_URI: datomic:sql://smoke-test?jdbc:postgresql://postgres:5432/datomic?user=datomic&password=datomic
     depends_on:
       - transactor
