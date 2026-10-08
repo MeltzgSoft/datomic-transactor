@@ -97,7 +97,8 @@ upserts three people, and queries them. It uses a fresh database and deletes it 
   `main`. `main` is protected: changes go through a PR, and the
   `Smoke test / smoke (pull_request)` check must pass. Job containers have no docker
   socket, so the workflow installs Datomic and runs `entrypoint.sh` directly instead of
-  using the compose stack. That means PR CI does not build or run the image itself.
+  using the compose stack. A second job, `build`, builds the Dockerfile with kaniko
+  (`--no-push`) so a broken Dockerfile fails the PR, but nothing runs the image on the forge.
 - **GitHub** (`.github/workflows/publish.yml`) runs when a `v#.#.#` tag arrives via the
   Forgejo push mirror. It builds the image, runs the compose stack and smoke test against
   that exact image, and only then pushes `vadercows/datomic-transactor` to Docker Hub. This

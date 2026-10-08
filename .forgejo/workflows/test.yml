@@ -82,3 +82,29 @@ jobs:
       - name: Transactor log
         if: failure()
         run: cat transactor.log
+
+  build:
+    # Builds the Dockerfile without pushing, so a broken download URL, COPY or
+    # apt step fails the PR instead of the release. The built image is not run
+    # (no docker socket); publish.yml on GitHub runs the smoke test against it
+    # before pushing. Kaniko builds without a docker daemon. Its image has no
+    # node, so actions/checkout is unavailable and kaniko clones the repo
+    # itself via a git build context.
+    runs-on: linux
+    container:
+      image: gcr.io/kaniko-project/executor:debug
+    steps:
+      - name: Build image (no push)
+        env:
+          GIT_USERNAME: ${{ github.actor }}
+          GIT_PASSWORD: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        shell: sh
+        run: |
+          set -eu
+          /kaniko/executor \
+            --context "git://${SERVER#https://}/${REPO}.git#${REF}" \
+            --dockerfile Dockerfile \
+            --no-push
