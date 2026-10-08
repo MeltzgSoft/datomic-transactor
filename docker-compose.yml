@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      # superuser, as in Datomic's docs; init-db creates the datomic db and role
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    tmpfs:
+      - /var/lib/postgresql/data  # in-memory; data is lost when the container is removed
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # one-shot: runs Datomic's bin/sql scripts, then exits
+  init-db:
+    build: .
+    image: datomic-transactor
+    command: init-db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATOMIC_DB_HOST: postgres
+      DATOMIC_ADMIN_USER: postgres
+      DATOMIC_ADMIN_PASSWORD: postgres
+      DATOMIC_DB_PASSWORD: datomic
+    restart: "no"
+
+  transactor:
+    build: .
+    image: datomic-transactor
+    depends_on:
+      init-db:
+        condition: service_completed_successfully
+    environment:
+      DATOMIC_DB_HOST: postgres
+      DATOMIC_DB_USER: datomic
+      DATOMIC_DB_PASSWORD: datomic
+      DATOMIC_ALT_HOST: transactor
+      DATOMIC_LICENSE_KEY: ${DATOMIC_LICENSE_KEY:-}
+    ports:
+      - "4334:4334"
+
+  # smoke test: docker compose run --rm smoke-test   (needs the stack up)
+  smoke-test:
+    image: datomic-transactor
+    profiles: ["test"]
+    entrypoint: ["java", "-Dlogback.configurationFile=/opt/datomic/bin/logback.xml", "-cp", "/opt/datomic/peer-1.0.7705.jar:/opt/datomic/lib/*", "clojure.main", "/test/smoke.clj"]
+    volumes:
+      - ./test:/test:ro
+    depends_on:
+      - transactor

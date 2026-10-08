@@ -1,0 +1,13 @@
+protocol=sql
+host=0.0.0.0
+alt-host=${DATOMIC_ALT_HOST}
+port=4334
+
+sql-url=jdbc:postgresql://${DATOMIC_DB_HOST}:${DATOMIC_DB_PORT}/${DATOMIC_DB_NAME}
+sql-user=${DATOMIC_DB_USER}
+sql-password=${DATOMIC_DB_PASSWORD}
+sql-driver-class=org.postgresql.Driver
+
+memory-index-threshold=32m
+memory-index-max=256m
+object-cache-max=128m
