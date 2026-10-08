@@ -12,7 +12,7 @@ jobs:
     # stack cannot run here. Postgres is a services: sidecar instead, and the
     # job installs Datomic and runs the image's real entrypoint.sh directly.
     # This exercises the entrypoint, properties template, init-db scripts and
-    # test/smoke.clj, but not the built image itself.
+    # test/smoke_test.clj, but not the built image itself.
     runs-on: linux
 
     env:
@@ -78,7 +78,7 @@ jobs:
         working-directory: test
         env:
           DATOMIC_URI: datomic:sql://smoke-test?jdbc:postgresql://postgres:5432/datomic?user=datomic&password=datomic
-        run: clojure -M smoke.clj
+        run: clojure -M -m smoke-test
       - name: Transactor log
         if: failure()
         run: cat transactor.log

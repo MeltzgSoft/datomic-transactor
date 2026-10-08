@@ -84,12 +84,12 @@ the transactor's container name for `DATOMIC_ALT_HOST` avoids any published port
 ## Smoke test
 
 `test/` is a stand-in for an external application: its own image, built from plain
-`clojure`, with the Datomic peer from Maven Central. `test/smoke.clj` creates a schema,
-upserts three people, and queries them.
+`clojure`, with the Datomic peer from Maven Central. `test/smoke_test.clj` is a `clojure.test` suite that creates a schema,
+upserts three people, and queries them. It uses a fresh database and deletes it afterwards.
 
 - `docker compose run --rm smoke-test` runs it inside the compose network.
 - To run it from the host, `transactor` must resolve to `127.0.0.1` (for example via
-  `/etc/hosts`), and `DATOMIC_URI` must point at `localhost:5432`. See `test/smoke.clj`.
+  `/etc/hosts`), and `DATOMIC_URI` must point at `localhost:5432`. See `test/smoke_test.clj`.
 
 ## CI and releases
 
